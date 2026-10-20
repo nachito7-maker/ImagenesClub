@@ -1,0 +1,7 @@
+import {chromium} from 'playwright';import fs from 'node:fs/promises';
+const browser=await chromium.launch({channel:'chrome',headless:true});const p=await browser.newPage({viewport:{width:1280,height:720},hasTouch:true});
+try{await p.goto(process.env.CLUB_URL||'http://127.0.0.1:5291');await p.waitForFunction(()=>window.club?.ready());await p.locator('[data-action="start"]').tap();await p.waitForTimeout(3500);await fs.mkdir('artifacts/production-captures',{recursive:true});
+const shot=async(name,x,z,zoom=1)=>{await p.evaluate(({x,z,zoom})=>{const v=window.club.view;v.pan.set(x,z);v.zoom=zoom;v.resize();window.club.ui.select(null);document.getElementById('toast').classList.remove('visible');},{x,z,zoom});await p.waitForTimeout(350);await p.screenshot({path:`artifacts/production-captures/${name}.png`});};
+await shot('01-entry',0,3.5,1.65);await shot('02-bar',4,0,1.65);await shot('03-museum',-4,0,1.65);await shot('04-central',0,0);await shot('05-normal-stage',0,-4,1.65);
+await p.evaluate(()=>{const g=window.club.game;g.selectedEvent='concert';g.open();g.spawnTimer=10000;g.spawn(4,'dance');g.spawn(4,'museum');g.spawn(2,'upstairs');g.spawn(2,'concert');for(let i=0;i<5;i++)g.spawn(1,'bar',true);g.speed=4;});await p.waitForFunction(()=>window.club.game.audit.some(a=>a.type==='activity'&&a.detail==='concert'),null,{timeout:30000});await shot('06-concert',0,-4,1.65);await p.evaluate(()=>window.club.view.setFloor(1));await shot('07-upper',0,0);await p.evaluate(()=>window.club.view.setFloor(0));await shot('10-busy-night',0,0);
+}finally{await browser.close();}

@@ -1,0 +1,17 @@
+import type {EventId} from '../core/catalog';
+import {ChorusMixer} from './chorus';
+
+export class ClubAudio {
+ context:AudioContext|null=null;gain:GainNode|null=null;muted=false;event:EventId='dj';beat=0;next=0;ambientNext=0;noise:AudioBuffer|null=null;
+ mixer:ChorusMixer|null=null;
+ unlock(){if(!this.context){this.context=new AudioContext();this.gain=this.context.createGain();this.gain.gain.value=.13;this.gain.connect(this.context.destination);this.mixer=new ChorusMixer(this.context,this.context.destination);this.noise=this.context.createBuffer(1,this.context.sampleRate*2,this.context.sampleRate);const data=this.noise.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;}void this.context.resume();}
+ toggle(){this.unlock();this.muted=!this.muted;if(this.gain)this.gain.gain.value=this.muted?0:.13;}
+ tone(freq:number,duration:number,type:OscillatorType='sine',volume=.3,when=0){if(!this.context||!this.gain)return;const t=when||this.context.currentTime;const o=this.context.createOscillator(),e=this.context.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);e.gain.setValueAtTime(volume,t);e.gain.exponentialRampToValueAtTime(.001,t+duration);o.connect(e);e.connect(this.gain);o.start(t);o.stop(t+duration);o.onended=()=>{o.disconnect();e.disconnect();};}
+ rustle(duration:number,frequency:number,volume:number,when=0){if(!this.context||!this.gain||!this.noise)return;const t=when||this.context.currentTime,s=this.context.createBufferSource(),f=this.context.createBiquadFilter(),e=this.context.createGain();s.buffer=this.noise;f.type='bandpass';f.frequency.value=frequency;f.Q.value=.7;e.gain.setValueAtTime(volume,t);e.gain.exponentialRampToValueAtTime(.001,t+duration);s.connect(f);f.connect(e);e.connect(this.gain);s.start(t);s.stop(t+duration);s.onended=()=>{s.disconnect();f.disconnect();e.disconnect();};}
+ effect(kind:string){this.unlock();const now=this.context?.currentTime??0;if(kind==='serve'||kind==='bottle'){this.tone(kind==='bottle'?950:1400,.12,'sine',.18);this.tone(2100,.07,'sine',.10);}else if(kind==='pay'){this.tone(660,.15);this.tone(880,.18,'sine',.3,now+.1);}else if(kind==='clean'||kind==='prepare'){this.rustle(.45,kind==='clean'?1100:3000,.16);}else if(kind==='open'||kind==='depart'){this.rustle(.35,180,.20);this.tone(90,.28,'triangle',.10);}else if(kind==='step'){this.rustle(.08,160,.13);}else this.tone(440,.09,'sine',.13);}
+ update(night:boolean,event:EventId,customers=0,moving=0){if(!this.context||this.context.state!=='running'||this.muted)return;this.event=event;const now=this.context.currentTime;if(this.ambientNext<now){this.ambientNext=now+.7;if(customers){this.rustle(.65,350+Math.sin(now)*130,Math.min(.18,customers*.008));this.tone(130+Math.sin(now*.4)*30,.25,'sine',.015);}if(moving)this.effect('step');}if(!night){this.next=now;return;}if(this.mixer?.ids.length)return;const bpm=event==='concert'?118:event==='dj'?112:92;while(this.next<now+.15){if(this.next<now-.3)this.next=now;const beat=this.beat++%16;if(beat%4===0){this.tone(62,.18,'sine',.60,this.next);this.tone(82.4,.22,'triangle',.27,this.next);}if(beat%4===2)this.rustle(.10,1800,.18,this.next);this.rustle(.035,5200,.06,this.next);this.next+=60/bpm/2;}}
+ async startPlaylist(ids:string[]){this.unlock();return this.mixer!.prepare(ids);}
+ syncMix(active:boolean,time:number,duration:number,speed:number){this.mixer?.update(active,time,duration,speed,this.muted);}
+ get musicStatus(){return this.mixer?.status??'Mezcla sin preparar';}
+ suspend(){this.mixer?.stop();void this.context?.suspend();}
+}

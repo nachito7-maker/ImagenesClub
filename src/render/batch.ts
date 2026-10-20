@@ -1,0 +1,14 @@
+import * as THREE from 'three';
+import type {Actor} from './characters';
+interface Bucket {mesh:THREE.InstancedMesh;count:number;}
+export class ActorBatch {
+ buckets=new Map<string,Bucket>();group=new THREE.Group();capacity=2000;shadow:THREE.InstancedMesh;dummy=new THREE.Object3D();
+ constructor(scene:THREE.Scene){scene.add(this.group);const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;const c=canvas.getContext('2d')!;const gradient=c.createRadialGradient(32,32,2,32,32,31);gradient.addColorStop(0,'rgba(0,0,0,.48)');gradient.addColorStop(.55,'rgba(0,0,0,.22)');gradient.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=gradient;c.fillRect(0,0,64,64);const material=new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(canvas),transparent:true,depthWrite:false});this.shadow=new THREE.InstancedMesh(new THREE.PlaneGeometry(1.2,1.0),material,80);this.shadow.frustumCulled=false;this.shadow.count=0;scene.add(this.shadow);}
+ update(actors:Actor[]){this.group.updateWorldMatrix(true,false);const inverse=this.group.matrixWorld.clone().invert();const local=new THREE.Matrix4();for(const bucket of this.buckets.values())bucket.count=0;let shadows=0;
+ for(const actor of actors){if(!actor.root.visible)continue;let parent:THREE.Object3D|null=actor.root.parent,visible=true;while(parent){if(!parent.visible)visible=false;parent=parent.parent;}if(!visible)continue;actor.root.updateWorldMatrix(true,true);
+ actor.root.traverse(o=>{if(!(o instanceof THREE.Mesh)||!o.visible)return;o.layers.set(1);const mat=o.material as THREE.MeshStandardMaterial;const colorBatch=mat instanceof THREE.MeshStandardMaterial&&!mat.map&&!mat.transparent;const key=`${o.geometry.uuid}:${colorBatch?`${mat.type}:${mat.roughness}:${mat.metalness}:${mat.side}`:mat.uuid}`;let bucket=this.buckets.get(key);if(!bucket){const shared=colorBatch?mat.clone():mat;if(colorBatch)shared.color.set('#ffffff');const mesh=new THREE.InstancedMesh(o.geometry,shared,this.capacity);mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.group.add(mesh);bucket={mesh,count:0};this.buckets.set(key,bucket);}if(bucket.count<this.capacity){if(colorBatch)bucket.mesh.setColorAt(bucket.count,mat.color);bucket.mesh.setMatrixAt(bucket.count++,local.multiplyMatrices(inverse,o.matrixWorld));}});
+ if(shadows<80){const p=actor.root.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverse);this.dummy.position.set(p.x,.085+p.y,p.z);this.dummy.rotation.set(-Math.PI/2,0,0);this.dummy.scale.set(1,1,1);this.dummy.updateMatrix();this.shadow.setMatrixAt(shadows++,this.dummy.matrix);}
+ }
+ for(const b of this.buckets.values()){b.mesh.count=b.count;b.mesh.instanceMatrix.needsUpdate=true;if(b.mesh.instanceColor)b.mesh.instanceColor.needsUpdate=true;}this.shadow.count=shadows;this.shadow.instanceMatrix.needsUpdate=true;
+ }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "imagenes-club",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5291 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:browser": "node tools/browser-check.mjs",
+    "build": "npm run typecheck && vite build",
+    "music": "node tools/generate-catalog.mjs && node tools/encode-music.mjs && node tools/analyse-catalog.mjs && node tools/encode-check.mjs",
+    "music:check": "node tools/analyse-catalog.mjs && node tools/encode-check.mjs",
+    "android": "bash tools/build-android.sh",
+    "android:release": "bash tools/build-android.sh release"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/three": "^0.180.0",
+    "ffmpeg-static": "^5.3.0",
+    "playwright": "^1.56.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9",
+    "vitest": "^3.2.4"
+  }
+}
